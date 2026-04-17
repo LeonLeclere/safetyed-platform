@@ -77,7 +77,8 @@ export default function DashboardPage() {
         .order('sort_order')
 
       const modules: Module[] = (classModules ?? [])
-        .map((cm: { module: Module }) => cm.module)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+.map((cm: any) => cm.module as Module)
         .filter(Boolean)
 
       classesWithModules.push({
