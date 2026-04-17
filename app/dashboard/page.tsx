@@ -77,7 +77,7 @@ export default function DashboardPage() {
         .order('sort_order')
 
       const modules: Module[] = (classModules ?? [])
-        .map((cm: any) => cm.module)
+        .map((cm: { module: Module }) => cm.module)
         .filter(Boolean)
 
       classesWithModules.push({
