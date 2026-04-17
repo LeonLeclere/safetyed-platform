@@ -165,7 +165,7 @@ export default function ClassPage() {
         {modules.length === 0 ? (
           <div style={{ background: '#fff', border: '1.5px dashed #d0cfcb', borderRadius: '12px', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#71717a', textAlign: 'center' }}>
             <div style={{ fontSize: '13px', fontWeight: 500 }}>No modules assigned yet</div>
-            <div style={{ fontSize: '12px' }}>Your teacher hasn't added any modules to this class</div>
+            <div style={{ fontSize: '12px' }}>Your teacher has not added any modules to this class</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
