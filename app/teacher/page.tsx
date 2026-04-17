@@ -234,10 +234,14 @@ export default function TeacherPage() {
                   onChange={e => setSubject(e.target.value)}
                   style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
                 >
-                  <option value="Food Technology">Food Technology</option>
-                  <option value="Wood Technology">Wood Technology</option>
-                  <option value="Metal Technology">Metal Technology</option>
-                  <option value="HPE">HPE</option>
+<option value="Food Technology">Food Technology</option>
+<option value="Hospitality Practices">Hospitality Practices</option>
+<option value="Industrial Technology and Design">Industrial Technology and Design</option>
+<option value="Furnishing Skills">Furnishing Skills</option>
+<option value="Engineering Skills">Engineering Skills</option>
+<option value="Agriculture">Agriculture</option>
+<option value="Science">Science</option>
+<option value="HPE">HPE</option>
                 </select>
               </div>
               <div>
