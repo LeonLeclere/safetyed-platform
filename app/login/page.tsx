@@ -15,11 +15,34 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
+    if (authError || !data.user) {
       setError('Invalid email or password. Please try again.')
       setLoading(false)
+      return
+    }
+
+    // Check role in profiles table
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single()
+
+    if (!profile) {
+      // No profile = student who signed up via Supabase auth directly
+      router.push('/dashboard')
+      return
+    }
+
+    if (profile.role === 'teacher') {
+      router.push('/teacher')
+      return
+    }
+
+    if (profile.role === 'admin') {
+      router.push('/admin')
       return
     }
 
@@ -45,6 +68,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500"
               placeholder="you@school.edu.au"
             />
@@ -56,6 +80,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500"
               placeholder="••••••••"
             />
@@ -66,9 +91,13 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-800 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-colors"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Signing in...' : 'Sign In →'}
           </button>
         </div>
+
+        <p style={{ textAlign: 'center', fontSize: '12px', color: '#52525b' }}>
+          Need an account? Contact your school administrator.
+        </p>
       </div>
     </main>
   )
