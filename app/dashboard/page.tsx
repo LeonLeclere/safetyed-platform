@@ -4,20 +4,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 
-type Module = {
-  id: string
-  name: string
-  machine_key: string
-  subject: string
-  estimated_minutes: number
-  section_count: number
-}
-
 type EnrolledClass = {
   id: string
   name: string
   subject: string
-  modules: Module[]
+  moduleCount: number
 }
 
 export default function DashboardPage() {
@@ -28,7 +19,6 @@ export default function DashboardPage() {
   const [enrolling, setEnrolling] = useState(false)
   const [enrollMessage, setEnrollMessage] = useState('')
   const [enrolledClasses, setEnrolledClasses] = useState<EnrolledClass[]>([])
-  const [completedModules, setCompletedModules] = useState<string[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -41,14 +31,12 @@ export default function DashboardPage() {
       setEmail(user.email ?? '')
       setUserId(user.id)
       await loadEnrolments(user.id)
-      await loadCompletions(user.id)
       setLoading(false)
     }
     init()
   }, [router])
 
   async function loadEnrolments(uid: string) {
-    // Get all classes this student is enrolled in
     const { data: enrolments, error } = await supabase
       .from('enrolments')
       .select('class_id')
@@ -58,7 +46,6 @@ export default function DashboardPage() {
 
     const classIds = enrolments.map(e => e.class_id)
 
-    // Get class details
     const { data: classes, error: classError } = await supabase
       .from('classes')
       .select('id, name, subject')
@@ -66,42 +53,23 @@ export default function DashboardPage() {
 
     if (classError || !classes) return
 
-    // Get modules for each class
-    const classesWithModules: EnrolledClass[] = []
+    const classesWithCounts: EnrolledClass[] = []
 
     for (const cls of classes) {
-      const { data: classModules } = await supabase
+      const { count } = await supabase
         .from('class_modules')
-        .select('sort_order, module:modules(id, name, machine_key, subject, estimated_minutes, section_count)')
+        .select('*', { count: 'exact', head: true })
         .eq('class_id', cls.id)
-        .order('sort_order')
 
-      const modules: Module[] = (classModules ?? [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-.map((cm: any) => cm.module as Module)
-        .filter(Boolean)
-
-      classesWithModules.push({
+      classesWithCounts.push({
         id: cls.id,
         name: cls.name,
         subject: cls.subject,
-        modules,
+        moduleCount: count ?? 0,
       })
     }
 
-    setEnrolledClasses(classesWithModules)
-  }
-
-  async function loadCompletions(uid: string) {
-    const { data: attempts } = await supabase
-      .from('attempts')
-      .select('module_id')
-      .eq('student_id', uid)
-      .eq('passed', true)
-
-    if (attempts) {
-      setCompletedModules(attempts.map(a => a.module_id))
-    }
+    setEnrolledClasses(classesWithCounts)
   }
 
   async function handleEnrol() {
@@ -111,7 +79,6 @@ export default function DashboardPage() {
 
     const code = classCode.trim().toUpperCase()
 
-    // Find the class by join code
     const { data: cls, error } = await supabase
       .from('classes')
       .select('id, name, subject')
@@ -125,7 +92,6 @@ export default function DashboardPage() {
       return
     }
 
-    // Check if already enrolled
     const { data: existing } = await supabase
       .from('enrolments')
       .select('id')
@@ -139,7 +105,6 @@ export default function DashboardPage() {
       return
     }
 
-    // Enrol the student
     const { error: enrolError } = await supabase
       .from('enrolments')
       .insert({ student_id: userId, class_id: cls.id })
@@ -153,40 +118,16 @@ export default function DashboardPage() {
     setEnrollMessage(`Enrolled in ${cls.name}!`)
     setClassCode('')
     setEnrolling(false)
-
-    // Reload enrolments
     await loadEnrolments(userId)
   }
 
-  function getModuleUrl(machineKey: string): string {
-    const map: Record<string, string> = {
-      'knife': '/modules/kitchen-knives.html',
-      'bandsaw': '/modules/bandsaw.html',
-    }
-    return map[machineKey] ?? '#'
-  }
-
-  function getModuleIcon(subject: string): string {
+  function getSubjectIcon(subject: string): string {
     if (subject.toLowerCase().includes('food')) return '🍽️'
     if (subject.toLowerCase().includes('wood')) return '🪚'
     if (subject.toLowerCase().includes('metal')) return '⚙️'
+    if (subject.toLowerCase().includes('hpe')) return '🏃'
     return '📋'
   }
-
-  // Flatten all modules across all classes (deduplicated by id)
-  const allModules: Module[] = []
-  const seen = new Set<string>()
-  for (const cls of enrolledClasses) {
-    for (const mod of cls.modules) {
-      if (!seen.has(mod.id)) {
-        seen.add(mod.id)
-        allModules.push(mod)
-      }
-    }
-  }
-
-  const completedCount = allModules.filter(m => completedModules.includes(m.id)).length
-  const inProgressCount = allModules.length - completedCount
 
   if (loading) {
     return (
@@ -202,7 +143,6 @@ export default function DashboardPage() {
     <div style={{ background: '#f4f3f0', minHeight: '100vh', fontFamily: 'Barlow, sans-serif' }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap');`}</style>
 
-      {/* Top Nav */}
       <nav style={{ background: '#1a1a1c', height: '56px', display: 'flex', alignItems: 'center', padding: '0 28px', gap: '20px', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, color: '#fff', letterSpacing: '0.04em' }}>
           Safety<span style={{ color: '#f97316' }}>Ed</span>
@@ -223,24 +163,19 @@ export default function DashboardPage() {
         </div>
       </nav>
 
-      {/* Page Body */}
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '28px 24px' }}>
 
-        {/* Page Header */}
         <div style={{ marginBottom: '24px' }}>
-          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '30px', fontWeight: 700 }}>
-            My Training
-          </div>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '30px', fontWeight: 700 }}>My Training</div>
           <div style={{ fontSize: '14px', color: '#71717a', marginTop: '3px' }}>{email}</div>
         </div>
 
-        {/* Stats Row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
           {[
-            { label: 'Modules Completed', value: String(completedCount), color: '#16a34a' },
-            { label: 'In Progress', value: String(inProgressCount), color: '#f97316' },
-            { label: 'Waivers Issued', value: String(completedCount), color: '#2563eb' },
             { label: 'Classes Enrolled', value: String(enrolledClasses.length), color: '#1a1a1c' },
+            { label: 'Modules Available', value: String(enrolledClasses.reduce((a, c) => a + c.moduleCount, 0)), color: '#f97316' },
+            { label: 'Modules Completed', value: '0', color: '#16a34a' },
+            { label: 'Waivers Issued', value: '0', color: '#2563eb' },
           ].map((stat) => (
             <div key={stat.label} style={{ background: '#fff', border: '1px solid #e4e4e0', borderRadius: '10px', padding: '16px 18px' }}>
               <div style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>{stat.label}</div>
@@ -249,7 +184,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Enrol Card */}
         <div style={{ background: '#1a1a1c', color: '#fff', borderRadius: '12px', padding: '20px 22px', marginBottom: '24px' }}>
           <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>Join a Class</div>
           <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.45)', marginBottom: '16px' }}>Enter the class code from your teacher</div>
@@ -276,68 +210,43 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Modules Section */}
         <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#71717a', marginBottom: '12px' }}>
-          My Modules
+          My Classes
         </div>
 
-        {allModules.length === 0 ? (
+        {enrolledClasses.length === 0 ? (
           <div style={{ background: '#fff', border: '1.5px dashed #d0cfcb', borderRadius: '12px', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#71717a', textAlign: 'center' }}>
             <div style={{ fontSize: '28px', fontWeight: 300 }}>+</div>
-            <div style={{ fontSize: '13px', fontWeight: 500 }}>No modules yet</div>
+            <div style={{ fontSize: '13px', fontWeight: 500 }}>No classes yet</div>
             <div style={{ fontSize: '12px' }}>Join a class above to get started</div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-            {allModules.map((mod) => {
-              const isComplete = completedModules.includes(mod.id)
-              const url = getModuleUrl(mod.machine_key)
-              return (
-                <div
-                  key={mod.id}
-                  style={{ background: '#fff', border: `1.5px solid ${isComplete ? 'rgba(22,163,74,0.3)' : '#e4e4e0'}`, borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}
-                >
-                  {/* Module Header */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: isComplete ? 'rgba(22,163,74,0.1)' : 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
-                      {getModuleIcon(mod.subject)}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '17px', fontWeight: 700, lineHeight: 1.2 }}>{mod.name}</div>
-                      <div style={{ fontSize: '12px', color: '#71717a', marginTop: '3px' }}>{mod.subject}</div>
-                    </div>
-                    {isComplete && (
-                      <div style={{ background: 'rgba(22,163,74,0.1)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.3)', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        ✓ Complete
-                      </div>
-                    )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+            {enrolledClasses.map((cls) => (
+              <div
+                key={cls.id}
+                onClick={() => router.push(`/class/${cls.id}`)}
+                style={{ background: '#fff', border: '1.5px solid #e4e4e0', borderRadius: '12px', padding: '20px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '14px' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#f97316')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#e4e4e0')}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
+                    {getSubjectIcon(cls.subject)}
                   </div>
-
-                  {/* Module Meta */}
-                  <div style={{ display: 'flex', gap: '16px' }}>
-                    <div style={{ fontSize: '12px', color: '#71717a' }}>
-                      <span style={{ fontWeight: 600, color: '#1a1a1c' }}>{mod.section_count}</span> sections
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#71717a' }}>
-                      <span style={{ fontWeight: 600, color: '#1a1a1c' }}>{mod.estimated_minutes}</span> min
-                    </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '18px', fontWeight: 700, lineHeight: 1.2 }}>{cls.name}</div>
+                    <div style={{ fontSize: '12px', color: '#71717a', marginTop: '3px' }}>{cls.subject}</div>
                   </div>
-
-                  {/* Status Bar */}
-                  <div style={{ height: '4px', background: '#f4f3f0', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: isComplete ? '100%' : '0%', background: isComplete ? '#16a34a' : '#f97316', borderRadius: '2px', transition: 'width 0.3s' }} />
-                  </div>
-
-                  {/* Action Button */}
-                  <a
-                    href={url}
-                    style={{ display: 'block', textAlign: 'center', padding: '10px', background: isComplete ? 'rgba(22,163,74,0.1)' : '#f97316', color: isComplete ? '#16a34a' : '#000', borderRadius: '8px', fontSize: '13px', fontWeight: 700, textDecoration: 'none', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.04em' }}
-                  >
-                    {isComplete ? 'Review Module' : 'Start Module →'}
-                  </a>
                 </div>
-              )
-            })}
+                <div style={{ fontSize: '13px', color: '#71717a' }}>
+                  <span style={{ fontWeight: 600, color: '#1a1a1c' }}>{cls.moduleCount}</span> {cls.moduleCount === 1 ? 'module' : 'modules'} assigned
+                </div>
+                <div style={{ paddingTop: '4px', borderTop: '1px solid #f4f3f0' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#f97316', fontFamily: 'Barlow Condensed, sans-serif' }}>View Modules →</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
