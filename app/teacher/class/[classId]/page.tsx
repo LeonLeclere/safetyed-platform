@@ -123,24 +123,22 @@ export default function ClassRosterPage() {
 
       // Load enrolled students
       const { data: enrolments } = await supabase
-        .from('enrolments')
-        .select('student_id, profiles:student_id(id, first_name, last_initial, year_level)')
-        .eq('class_id', classId)
+  .from('enrolments')
+  .select('student_id')
+  .eq('class_id', classId)
 
-      // Note: if roster shows 0 students when students have joined,
-      // swap 'profiles:student_id' to 'users:student_id' — depends which table name your codebase uses
-      let studs: Student[] = []
-      if (enrolments) {
-        studs = enrolments
-          .filter((e: any) => e.profiles)
-          .map((e: any) => ({
-            id: e.profiles.id,
-            first_name: e.profiles.first_name,
-            last_initial: e.profiles.last_initial,
-            year_level: e.profiles.year_level,
-          }))
-        studs.sort((a, b) => a.first_name.localeCompare(b.first_name))
-        setStudents(studs)
+let studs: Student[] = []
+if (enrolments && enrolments.length > 0) {
+  const studentIds = enrolments.map((e: any) => e.student_id)
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_initial, year_level')
+    .in('id', studentIds)
+  if (profileData) {
+    studs = profileData
+    studs.sort((a, b) => a.first_name.localeCompare(b.first_name))
+    setStudents(studs)
+  }
       }
 
       // Load attempts
