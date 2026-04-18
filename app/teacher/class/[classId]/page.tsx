@@ -182,7 +182,7 @@ export default function ClassRosterPage() {
             if (!matchingAttempt) {
               // Could be a new attempt — reload attempts then progress
               if (studs.length === 0) return
-              const studentIds = studs.map(s => s.id)
+              const studentIds = studs.map((s: Student) => s.id)
               const { data: fresh } = await supabase
                 .from('attempts')
                 .select('id, student_id, module_id, passed, completed_at, score')
