@@ -328,6 +328,12 @@ export default function TeacherPage() {
                 >
                   Copy Code
                 </button>
+                <button
+  onClick={() => router.push(`/teacher/class/${cls.id}`)}
+  style={{ padding: '10px 18px', background: '#f97316', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', color: '#000', fontFamily: 'Barlow Condensed, sans-serif' }}
+>
+  View Class →
+</button>
               </div>
             ))}
           </div>
