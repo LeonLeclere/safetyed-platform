@@ -116,7 +116,7 @@ export default function SignupPage() {
 
       router.push('/dashboard')
 
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.')
       setLoading(false)
     }
@@ -217,7 +217,7 @@ export default function SignupPage() {
                     background: '#1e2130', border: '1px solid #2a2d3a', borderRadius: '10px',
                     marginTop: '4px', padding: '14px', color: '#6b7280', fontSize: '13px', zIndex: 50,
                   }}>
-                    No schools found. Contact your teacher if your school isn't listed.
+                    No schools found. Contact your teacher if your school isn&apos;t listed.
                   </div>
                 )}
               </div>
