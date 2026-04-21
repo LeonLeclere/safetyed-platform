@@ -884,6 +884,10 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const _params = new URLSearchParams(window.location.search);
 const _attemptId = _params.get('attemptId');
+const _token = _params.get('token');
+if (_token) {
+  _supabase.auth.setSession({ access_token: _token, refresh_token: _token });
+}
 const _classId = _params.get('classId');
 
 // Map section index (0–6) to section_number (1–5) stored in progress table

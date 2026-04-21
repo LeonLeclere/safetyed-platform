@@ -141,7 +141,9 @@ export default function ClassPage() {
         return
       }
 
-      window.location.href = `${baseUrl}?attemptId=${attemptId}&classId=${classId}`
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token ?? ""
+      window.location.href = `${baseUrl}?attemptId=${attemptId}&classId=${classId}&token=${accessToken}`
     } catch (err) {
       console.error('handleStartModule error:', err)
       setStartingModule(null)
