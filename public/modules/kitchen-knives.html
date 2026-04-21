@@ -873,7 +873,48 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-
 
 </div><!-- end page -->
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// ═══════════════════════════════════════════════
+// SUPABASE + URL PARAMS
+// ═══════════════════════════════════════════════
+const SUPABASE_URL = 'https://kzfqgpgfgsakisuuvofn.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZnFncGdmZ3Nha2lzdXV2b2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NDMxNDEsImV4cCI6MjA5MTIxOTE0MX0.pMiFdfNjiz6xBiOr9nEvju4PhI2TBHVxt8nvzIkZztg';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const _params = new URLSearchParams(window.location.search);
+const _attemptId = _params.get('attemptId');
+const _classId = _params.get('classId');
+
+// Map section index (0–6) to section_number (1–5) stored in progress table
+// Sections 0=intro, 1=warmup are pre-module; sections 2–6 map to 1–5
+function sectionToProgressNumber(n) {
+  if (n < 2) return null; // intro/warmup don't save to progress
+  return n - 1; // section 2 → progress 1, section 6 → progress 5
+}
+
+async function saveProgressToSupabase(sectionIndex) {
+  if (!_attemptId) return; // no attempt ID = module opened directly, skip
+  const sectionNumber = sectionToProgressNumber(sectionIndex);
+  if (!sectionNumber) return;
+  const { error } = await _supabase
+    .from('progress')
+    .upsert(
+      { attempt_id: _attemptId, section_number: sectionNumber, completed: true, data: {}, updated_at: new Date().toISOString() },
+      { onConflict: 'attempt_id,section_number' }
+    );
+  if (error) console.warn('Progress save failed:', error.message);
+}
+
+async function markAttemptComplete() {
+  if (!_attemptId) return;
+  const { error } = await _supabase
+    .from('attempts')
+    .update({ completed_at: new Date().toISOString(), passed: true, score: 100 })
+    .eq('id', _attemptId);
+  if (error) console.warn('Attempt completion failed:', error.message);
+}
+
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
@@ -991,6 +1032,11 @@ function goToSection(n) {
   currentSection = n;
   updateProgress();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  // When moving TO section n, the previous section (n-1) is complete.
+  // Sections 2–6 are the actual content sections (index 2=S1 ... 6=S5).
+  // goToSection(3) means S1 is done → progress section_number=1
+  // goToSection(4) means S2 is done → progress section_number=2, etc.
+  if (n >= 3 && n <= 6) saveProgressToSupabase(n - 2);
 }
 
 function updateProgress() {
@@ -1824,6 +1870,9 @@ function submitDecl() {
 
   // Show physical demo requirement prominently
   document.getElementById('demoRequiredBox').style.display = 'block';
+
+  // Save final section and mark attempt complete in Supabase
+  saveProgressToSupabase(5).then(() => markAttemptComplete());
 
   updateProgress();
   window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -25,6 +25,8 @@ export default function ClassPage() {
   const [modules, setModules] = useState<Module[]>([])
   const [completedModules, setCompletedModules] = useState<string[]>([])
   const [email, setEmail] = useState('')
+  const [userId, setUserId] = useState('')
+  const [startingModule, setStartingModule] = useState<string | null>(null)
   const router = useRouter()
   const params = useParams()
   const classId = params.id as string
@@ -37,6 +39,7 @@ export default function ClassPage() {
         return
       }
       setEmail(user.email ?? '')
+      setUserId(user.id)
 
       // Verify student is enrolled in this class
       const { data: enrolment } = await supabase
@@ -89,6 +92,61 @@ export default function ClassPage() {
     }
     init()
   }, [classId, router])
+
+  async function handleStartModule(mod: Module) {
+    if (startingModule) return // prevent double-click
+    setStartingModule(mod.id)
+
+    try {
+      // Check if an attempt already exists (resume support)
+      const { data: existing } = await supabase
+        .from('attempts')
+        .select('id')
+        .eq('student_id', userId)
+        .eq('module_id', mod.id)
+        .eq('class_id', classId)
+        .single()
+
+      let attemptId: string
+
+      if (existing) {
+        // Resume existing attempt
+        attemptId = existing.id
+      } else {
+        // Create new attempt row
+        const { data: newAttempt, error } = await supabase
+          .from('attempts')
+          .insert({
+            student_id: userId,
+            module_id: mod.id,
+            class_id: classId,
+            started_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single()
+
+        if (error || !newAttempt) {
+          console.error('Failed to create attempt:', error?.message)
+          setStartingModule(null)
+          return
+        }
+
+        attemptId = newAttempt.id
+      }
+
+      // Navigate to the module with attemptId and classId as URL params
+      const baseUrl = getModuleUrl(mod.machine_key)
+      if (baseUrl === '#') {
+        setStartingModule(null)
+        return
+      }
+
+      window.location.href = `${baseUrl}?attemptId=${attemptId}&classId=${classId}`
+    } catch (err) {
+      console.error('handleStartModule error:', err)
+      setStartingModule(null)
+    }
+  }
 
   function getModuleUrl(machineKey: string): string {
     const map: Record<string, string> = {
@@ -171,7 +229,7 @@ export default function ClassPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {modules.map((mod, index) => {
               const isComplete = completedModules.includes(mod.id)
-              const url = getModuleUrl(mod.machine_key)
+              const isStarting = startingModule === mod.id
               return (
                 <div
                   key={mod.id}
@@ -203,12 +261,26 @@ export default function ClassPage() {
                   )}
 
                   {/* Button */}
-                  <a
-                    href={url}
-                    style={{ padding: '10px 20px', background: isComplete ? 'rgba(22,163,74,0.1)' : '#f97316', color: isComplete ? '#16a34a' : '#000', borderRadius: '8px', fontSize: '13px', fontWeight: 700, textDecoration: 'none', fontFamily: 'Barlow Condensed, sans-serif', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  <button
+                    onClick={() => handleStartModule(mod)}
+                    disabled={isStarting}
+                    style={{
+                      padding: '10px 20px',
+                      background: isStarting ? '#d0cfcb' : isComplete ? 'rgba(22,163,74,0.1)' : '#f97316',
+                      color: isStarting ? '#71717a' : isComplete ? '#16a34a' : '#000',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      fontFamily: 'Barlow Condensed, sans-serif',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      border: 'none',
+                      cursor: isStarting ? 'wait' : 'pointer',
+                    }}
                   >
-                    {isComplete ? 'Review' : 'Start →'}
-                  </a>
+                    {isStarting ? 'Loading...' : isComplete ? 'Review' : 'Start →'}
+                  </button>
                 </div>
               )
             })}
