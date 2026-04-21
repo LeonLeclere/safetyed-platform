@@ -893,8 +893,7 @@ const _classId = _params.get('classId');
 // Map section index (0–6) to section_number (1–5) stored in progress table
 // Sections 0=intro, 1=warmup are pre-module; sections 2–6 map to 1–5
 function sectionToProgressNumber(n) {
-  if (n < 2) return null; // intro/warmup don't save to progress
-  return n - 1; // section 2 → progress 1, section 6 → progress 5
+  return n;
 }
 
 async function saveProgressToSupabase(sectionIndex) {
